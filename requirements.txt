@@ -1,0 +1,8 @@
+numpy
+theano 
+keras
+keras-rl
+gym 
+requests 
+
+
