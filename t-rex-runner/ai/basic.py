@@ -9,11 +9,12 @@ def basic_ai(jump_d):
 
 	jump()
 	jump()
+    
+    while True:
+    	speed , obs_dist  = getVals()[:2]
 
-	speed , obs_dist  = getVals()[:2]
-
-	if obs_dist < jump_d :
-		jump()
+    	if obs_dist < jump_d :
+    		jump()
 
 
 basic_ai(150)
