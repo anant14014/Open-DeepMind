@@ -1,9 +1,12 @@
 // Copyright (c) 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// Edited by Max de D. for debug purposes.
+
 (function() {
 'use strict';
-/**
+/*
  * T-Rex runner.
  * @param {string} outerContainerId Outer containing element id.
  * @param {Object} opt_config
@@ -75,6 +78,18 @@ window['Runner'] = Runner;
 
 
 /**
+ * Debug infos.
+ * @global vars
+ */
+cookie.set('speed', 6);
+cookie.set('obs_dist', 600);
+cookie.set('obs_size', 20);
+cookie.set('passed', 0);
+cookie.set('score', 0);
+cookie.set('crashed', false);
+
+
+/**
  * Default game width.
  * @const
  */
@@ -88,16 +103,6 @@ var FPS = 60;
 
 /** @const */
 var IS_HIDPI = window.devicePixelRatio > 1;
-
-/** @const */
-var IS_IOS = window.navigator.userAgent.indexOf('CriOS') > -1 ||
-    window.navigator.userAgent == 'UIWebViewForStaticFileContent';
-
-/** @const */
-var IS_MOBILE = window.navigator.userAgent.indexOf('Mobi') > -1 || IS_IOS;
-
-/** @const */
-var IS_TOUCH_ENABLED = 'ontouchstart' in window;
 
 /**
  * Default game configuration.
@@ -228,7 +233,8 @@ Runner.prototype = {
    * @return {boolean}
    */
   isDisabled: function() {
-    return loadTimeData && loadTimeData.valueExists('disabledEasterEgg');
+    // return loadTimeData && loadTimeData.valueExists('disabledEasterEgg');
+    return true
   },
 
   /**
@@ -294,25 +300,24 @@ Runner.prototype = {
    * Load and decode base 64 encoded sounds.
    */
   loadSounds: function() {
-    if (!IS_IOS) {
-      this.audioContext = new AudioContext();
+    this.audioContext = new AudioContext();
 
-      var resourceTemplate =
-          document.getElementById(this.config.RESOURCE_TEMPLATE_ID).content;
+    var resourceTemplate =
+        document.getElementById(this.config.RESOURCE_TEMPLATE_ID).content;
 
-      for (var sound in Runner.sounds) {
-        var soundSrc =
-            resourceTemplate.getElementById(Runner.sounds[sound]).src;
-        soundSrc = soundSrc.substr(soundSrc.indexOf(',') + 1);
-        var buffer = decodeBase64ToArrayBuffer(soundSrc);
+    for (var sound in Runner.sounds) {
+      var soundSrc =
+          resourceTemplate.getElementById(Runner.sounds[sound]).src;
+      soundSrc = soundSrc.substr(soundSrc.indexOf(',') + 1);
+      var buffer = decodeBase64ToArrayBuffer(soundSrc);
 
-        // Async, so no guarantee of order in array.
-        this.audioContext.decodeAudioData(buffer, function(index, audioData) {
-            this.soundFx[index] = audioData;
-          }.bind(this, sound));
-      }
+      // Async, so no guarantee of order in array.
+      this.audioContext.decodeAudioData(buffer, function(index, audioData) {
+          this.soundFx[index] = audioData;
+        }.bind(this, sound));
     }
   },
+
 
   /**
    * Sets the game speed. Adjust the speed accordingly if on a smaller screen.
@@ -366,10 +371,6 @@ Runner.prototype = {
     this.tRex = new Trex(this.canvas, this.spriteDef.TREX);
 
     this.outerContainerEl.appendChild(this.containerEl);
-
-    if (IS_MOBILE) {
-      this.createTouchController();
-    }
 
     this.startListening();
     this.update();
@@ -502,6 +503,9 @@ Runner.prototype = {
    * Update the game frame.
    */
   update: function() {
+    
+    cookie.set('speed', this.currentSpeed);
+
     this.drawPending = false;
 
     var now = getTimeStamp();
@@ -588,16 +592,10 @@ Runner.prototype = {
     document.addEventListener(Runner.events.KEYDOWN, this);
     document.addEventListener(Runner.events.KEYUP, this);
 
-    if (IS_MOBILE) {
-      // Mobile only touch devices.
-      this.touchController.addEventListener(Runner.events.TOUCHSTART, this);
-      this.touchController.addEventListener(Runner.events.TOUCHEND, this);
-      this.containerEl.addEventListener(Runner.events.TOUCHSTART, this);
-    } else {
-      // Mouse.
-      document.addEventListener(Runner.events.MOUSEDOWN, this);
-      document.addEventListener(Runner.events.MOUSEUP, this);
-    }
+    // Mouse.
+    document.addEventListener(Runner.events.MOUSEDOWN, this);
+    document.addEventListener(Runner.events.MOUSEUP, this);
+
     window.addEventListener(Runner.events.GAMEPADCONNECTED, this);
     window.setInterval(this.pollGamepads.bind(this), 10);
   },
@@ -636,14 +634,8 @@ Runner.prototype = {
     document.removeEventListener(Runner.events.KEYDOWN, this);
     document.removeEventListener(Runner.events.KEYUP, this);
 
-    if (IS_MOBILE) {
-      this.touchController.removeEventListener(Runner.events.TOUCHSTART, this);
-      this.touchController.removeEventListener(Runner.events.TOUCHEND, this);
-      this.containerEl.removeEventListener(Runner.events.TOUCHSTART, this);
-    } else {
-      document.removeEventListener(Runner.events.MOUSEDOWN, this);
-      document.removeEventListener(Runner.events.MOUSEUP, this);
-    }
+    document.removeEventListener(Runner.events.MOUSEDOWN, this);
+    document.removeEventListener(Runner.events.MOUSEUP, this);
   },
 
   /**
@@ -651,11 +643,6 @@ Runner.prototype = {
    * @param {Event} e
    */
   onKeyDown: function(e) {
-    // Prevent native page scrolling whilst tapping on mobile.
-    if (IS_MOBILE) {
-      e.preventDefault();
-    }
-
     // if (e.target != this.detailsButton) {
       if (!this.crashed && (Runner.keycodes.JUMP[e.keyCode] ||
            e.type == Runner.events.TOUCHSTART || e.type == Runner.events.GAMEPADCONNECTED)) {
@@ -755,10 +742,10 @@ Runner.prototype = {
    */
   gameOver: function() {
     this.playSound(this.soundFx.HIT);
-    vibrate(200);
 
     this.stop();
     this.crashed = true;
+    cookie.set('crashed', true);
     this.distanceMeter.acheivement = false;
 
     this.tRex.update(100, Trex.status.CRASHED);
@@ -805,6 +792,7 @@ Runner.prototype = {
       this.runningTime = 0;
       this.activated = true;
       this.crashed = false;
+      cookie.set('crashed', false);
       this.distanceRan = 0;
       this.setSpeed(this.config.SPEED);
 
@@ -905,17 +893,6 @@ function getRandomNum(min, max) {
 
 
 /**
- * Vibrate on mobile devices.
- * @param {number} duration Duration of the vibration in milliseconds.
- */
-function vibrate(duration) {
-  if (IS_MOBILE && window.navigator.vibrate) {
-    window.navigator.vibrate(duration);
-  }
-}
-
-
-/**
  * Create canvas element.
  * @param {HTMLElement} container Element to append canvas to.
  * @param {number} width
@@ -957,7 +934,7 @@ function decodeBase64ToArrayBuffer(base64String) {
  * @return {number}
  */
 function getTimeStamp() {
-  return IS_IOS ? new Date().getTime() : performance.now();
+  return performance.now();
 }
 
 
@@ -1207,8 +1184,7 @@ function CollisionBox(x, y, w, h) {
  * @param {number} gapCoefficient Mutipler in determining the gap.
  * @param {number} speed
  */
-function Obstacle(canvasCtx, type, spriteImgPos, dimensions,
-    gapCoefficient, speed) {
+function Obstacle(canvasCtx, type, spriteImgPos, dimensions, gapCoefficient, speed) {
 
   this.canvasCtx = canvasCtx;
   this.spritePos = spriteImgPos;
@@ -1262,8 +1238,7 @@ Obstacle.prototype = {
 
     // Check if obstacle can be positioned at various heights.
     if (Array.isArray(this.typeConfig.yPos))  {
-      var yPosConfig = IS_MOBILE ? this.typeConfig.yPosMobile :
-          this.typeConfig.yPos;
+      var yPosConfig = this.typeConfig.yPos;
       this.yPos = yPosConfig[getRandomNum(0, yPosConfig.length - 1)];
     } else {
       this.yPos = this.typeConfig.yPos;
@@ -1808,6 +1783,8 @@ Trex.prototype = {
     this.midair = false;
     this.speedDrop = false;
     this.jumpCount = 0;
+    cookie.set('obs_dist', 600);
+    cookie.set('obs_size', 20);
   }
 };
 
@@ -1932,11 +1909,7 @@ DistanceMeter.prototype = {
     var targetHeight = DistanceMeter.dimensions.HEIGHT;
 
     // For high DPI we 2x source values.
-    if (IS_HIDPI) {
-      sourceWidth *= 2;
-      sourceHeight *= 2;
-      sourceX *= 2;
-    }
+    if (IS_HIDPI) {sourceWidth *= 2; sourceHeight *= 2; sourceX *= 2;}
 
     sourceX += this.spritePos.x;
     sourceY += this.spritePos.y;
@@ -1980,54 +1953,54 @@ DistanceMeter.prototype = {
     var paint = true;
     var playSound = false;
 
-    if (!this.acheivement) {
-      distance = this.getActualDistance(distance);
+    distance = this.getActualDistance(distance);
+    cookie.set('score', distance);
 
-      // Score has gone beyond the initial digit count.
-      if (distance > this.maxScore && this.maxScoreUnits ==
-        this.config.MAX_DISTANCE_UNITS) {
-        this.maxScoreUnits++;
-        this.maxScore = parseInt(this.maxScore + '9');
-      } else {
-        this.distance = 0;
-      }
-
-      if (distance > 0) {
-        // Acheivement unlocked
-        if (distance % this.config.ACHIEVEMENT_DISTANCE == 0) {
-          // Flash score and play sound.
-          this.acheivement = true;
-          this.flashTimer = 0;
-          playSound = true;
-        }
-
-        // Create a string representation of the distance with leading 0.
-        var distanceStr = (this.defaultString +
-            distance).substr(-this.maxScoreUnits);
-        this.digits = distanceStr.split('');
-      } else {
-        this.digits = this.defaultString.split('');
-      }
+    // Score has gone beyond the initial digit count.
+    if (distance > this.maxScore && this.maxScoreUnits ==
+      this.config.MAX_DISTANCE_UNITS) {
+      this.maxScoreUnits++;
+      this.maxScore = parseInt(this.maxScore + '9');
     } else {
-      // Control flashing of the score on reaching acheivement.
-      if (this.flashIterations <= this.config.FLASH_ITERATIONS) {
-        this.flashTimer += deltaTime;
-
-        if (this.flashTimer < this.config.FLASH_DURATION) {
-          paint = false;
-        } else if (this.flashTimer >
-            this.config.FLASH_DURATION * 2) {
-          this.flashTimer = 0;
-          this.flashIterations++;
-        }
-      } else {
-        this.acheivement = false;
-        this.flashIterations = 0;
-        this.flashTimer = 0;
-      }
+      this.distance = 0;
     }
 
-    // Draw the digits if not flashing.
+    if (distance > 0) {
+      // Acheivement unlocked
+      if (distance % this.config.ACHIEVEMENT_DISTANCE == 0) {
+        // Flash score and play sound.
+        this.acheivement = true;
+        this.flashTimer = 0;
+        playSound = true;
+      }
+
+      // Create a string representation of the distance with leading 0.
+      var distanceStr = (this.defaultString +
+          distance).substr(-this.maxScoreUnits);
+      this.digits = distanceStr.split('');
+
+      // Create a string representation of the speed.
+      var speedStr = Math.floor(1000*cookie('speed')).toString()
+      this.digits2 = speedStr.split('');
+
+      // Create a string representation of the next obstacle distance.
+      var speedStr = cookie('obs_dist').toString()
+      this.digits3 = speedStr.split('');
+
+      // Create a string representation of the next obstacle size.
+      var speedStr = cookie('obs_size').toString()
+      this.digits4 = speedStr.split('');
+
+      // Create a string representation of the passed obstacles count.
+      var passedStr = cookie('passed').toString()
+      this.digits5 = passedStr.split('');
+
+    } else {
+      this.digits  = this.defaultString.split('');
+    }
+
+
+    // Draw the digits of the total ran distance.
     if (paint) {
       for (var i = this.digits.length - 1; i >= 0; i--) {
         this.draw(i, parseInt(this.digits[i]));
@@ -2070,6 +2043,7 @@ DistanceMeter.prototype = {
   reset: function() {
     this.update(0);
     this.acheivement = false;
+    cookie.set('passed', 0);
   }
 };
 
@@ -2407,6 +2381,15 @@ Horizon.prototype = {
    * @param {number} currentSpeed
    */
   updateObstacles: function(deltaTime, currentSpeed) {
+    // Infos sur l'Obs le plus proche
+    if (this.obstacles.length > 0) {
+      cookie.set('obs_dist', this.obstacles[0].xPos)
+      cookie.set('obs_size', this.obstacles[0].width)
+    } else {
+      cookie.set('obs_dist', 600)
+      cookie.set('obs_size', 20)
+    }
+    
     // Obstacles, move to Horizon layer.
     var updatedObstacles = this.obstacles.slice(0);
 
@@ -2417,14 +2400,15 @@ Horizon.prototype = {
       // Clean up existing obstacles.
       if (obstacle.remove) {
         updatedObstacles.shift();
+        cookie.set('passed', parseInt(cookie('passed')) + 1)
+
       }
     }
     this.obstacles = updatedObstacles;
 
     if (this.obstacles.length > 0) {
       var lastObstacle = this.obstacles[this.obstacles.length - 1];
-
-      if (lastObstacle && !lastObstacle.followingObstacleCreated &&
+      if (lastObstacle && !lastObstacle.followlastObingObstacleCreated &&
           lastObstacle.isVisible() &&
           (lastObstacle.xPos + lastObstacle.width + lastObstacle.gap) <
           this.dimensions.WIDTH) {
@@ -2511,5 +2495,3 @@ Horizon.prototype = {
 
 //start the game
 new Runner('.interstitial-wrapper');
-
-
